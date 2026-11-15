@@ -13,7 +13,8 @@ use App\Models\School;
 
 class SyncLocations extends Command
 {
-    protected $signature = 'sync:locations';
+    protected $signature = 'sync:locations
+        {--desde= : Código de región (ej. 08) desde la cual retomar la sincronización}';
     protected $description = 'Sincroniza regiones, provincias, distritos y escuelas desde la API y las registra en la base de datos';
 
     public function __construct()
@@ -45,6 +46,12 @@ class SyncLocations extends Command
 
         for ($i=0;$i<count($regions);$i++) {
             $region=$regions[$i];
+
+            // Permite retomar una sincronización interrumpida: php artisan sync:locations --desde=08
+            $desde = $this->option('desde');
+            if ($desde && strcmp($region['idRegion'], str_pad($desde, 2, '0', STR_PAD_LEFT)) < 0) {
+                continue;
+            }
             Region::updateOrCreate(
                 ['idRegion' => $region['idRegion']],
                 [

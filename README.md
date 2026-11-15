@@ -153,6 +153,15 @@ php artisan sync:locations
 
 > ⏱️ **Nota:** La sincronización total recorre más de 1,800 distritos y 80,000 colegios, por lo que puede tomar varios minutos según la velocidad de conexión y respuesta del servidor del MINEDU.
 
+### Retomar una sincronización interrumpida
+Si el proceso se detiene (corte de conexión, cierre de la terminal, etc.), puedes continuar desde una región concreta con la opción `--desde`. El código de región son los **dos primeros dígitos** del último distrito mostrado:
+
+```bash
+php artisan sync:locations --desde=08
+```
+
+Las regiones anteriores se omiten; la región indicada se vuelve a procesar sin duplicar datos (`updateOrCreate`). Si ESCALE no responde para un distrito, se reintenta 3 veces y, si sigue fallando, se muestra un error en rojo y se continúa con el siguiente.
+
 ---
 
 ## 📡 Documentación de la API REST
