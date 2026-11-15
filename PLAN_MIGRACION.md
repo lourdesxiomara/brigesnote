@@ -128,6 +128,6 @@ continuar con el siguiente distrito.
 
 - Migración a OpenAPI / arquitectura de microservicios (clase del jueves).
 - Mejoras detectadas en la sincronización, a tratar en commits aparte:
-  - Paginación en la consulta de colegios (posibles colegios faltantes).
-  - Campos sin `?? null` que pueden detener la sincronización.
+  - ✅ Paginación en la consulta de colegios: ESCALE devolvía como máximo 50 por distrito (57,245 en total). Ahora se recorren todas las páginas con `start` y `max`.
+  - ✅ Campos sin `?? null` que podían detener la sincronización.
   - Pausas entre peticiones a ESCALE (los reintentos ya se añadieron).
