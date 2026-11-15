@@ -3,6 +3,8 @@
 namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use App\Models\Region;
 use App\Models\Province;
@@ -33,11 +35,9 @@ class SyncLocations extends Command
     private function syncRegions()
     {
         $this->info('Sincronizando regiones...');
-        $response = Http::withHeaders([
-            'Accept' => 'application/json', // Especifica que la respuesta esperada es JSON
-        ])->get('https://escale.minedu.gob.pe/padron/rest/regiones');
+        $response = $this->fetch('https://escale.minedu.gob.pe/padron/rest/regiones');
 
-        if ($response->failed()) {
+        if (!$response || $response->failed()) {
             $this->error('Error al obtener regiones');
             return;
         }
@@ -64,13 +64,11 @@ class SyncLocations extends Command
     private function syncProvinces($regionId)
     {
         $this->info("Sincronizando provincias para la región $regionId...");
-        $response = Http::withHeaders([
-            'Accept' => 'application/json', // Especifica que la respuesta esperada es JSON
-        ])->get('https://escale.minedu.gob.pe/padron/rest/provincias', [
+        $response = $this->fetch('https://escale.minedu.gob.pe/padron/rest/provincias', [
             'idRegion' => $regionId,
         ]);
 
-        if ($response->failed()) {
+        if (!$response || $response->failed()) {
             $this->error("Error al obtener provincias para la región $regionId");
             return;
         }
@@ -107,13 +105,11 @@ class SyncLocations extends Command
     private function syncDistricts($provinceId)
     {
         $this->info("Sincronizando distritos para la provincia $provinceId...");
-        $response = Http::withHeaders([
-            'Accept' => 'application/json', // Especifica que la respuesta esperada es JSON
-        ])->get('https://escale.minedu.gob.pe/padron/rest/distritos', [
+        $response = $this->fetch('https://escale.minedu.gob.pe/padron/rest/distritos', [
             'idProvincia' => $provinceId,
         ]);
 
-        if ($response->failed()) {
+        if (!$response || $response->failed()) {
             $this->error("Error al obtener distritos para la provincia $provinceId");
             return;
         }
@@ -148,14 +144,12 @@ class SyncLocations extends Command
     private function syncSchools($districtId)
     {
         $this->info("Sincronizando escuelas para el distrito $districtId...");
-        $response = Http::withHeaders([
-            'Accept' => 'application/json', // Especifica que la respuesta esperada es JSON
-        ])->get('https://escale.minedu.gob.pe/padron/rest/instituciones', [
+        $response = $this->fetch('https://escale.minedu.gob.pe/padron/rest/instituciones', [
             'estados' => 1,
             'ubigeo' => $districtId,
         ]);
 
-        if ($response->failed()) {
+        if (!$response || $response->failed()) {
             $this->error("Error al obtener escuelas para el distrito $districtId");
             return;
         }
@@ -195,5 +189,25 @@ class SyncLocations extends Command
         }
 
         $this->info("Escuelas para el distrito $districtId sincronizadas correctamente.");
+    }
+
+    /**
+     * Petición GET a la API de ESCALE.
+     * Laravel 13 corta las peticiones a los 30 s por defecto (Laravel 7 no tenía límite),
+     * y ESCALE puede tardar más en distritos con muchos colegios. Por eso se amplía el
+     * tiempo de espera, se reintenta y, si aun así falla, se registra el error y se continúa.
+     */
+    private function fetch(string $url, array $query = []): ?Response
+    {
+        try {
+            return Http::withHeaders(['Accept' => 'application/json'])
+                ->timeout(120)
+                ->retry(3, 2000, throw: false)
+                ->get($url, $query);
+        } catch (ConnectionException $e) {
+            $this->error("Sin respuesta de ESCALE ({$url} ".json_encode($query).'): '.$e->getMessage());
+
+            return null;
+        }
     }
 }

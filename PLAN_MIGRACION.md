@@ -82,14 +82,14 @@ Limpieza adicional:
 
 ## 7. Pasos (un commit por paso)
 
-- [ ] **Paso 0:** Crear este plan y hacer commit. *(antes de ejecutar el agente)*
-- [ ] **Paso 1:** Crear el esqueleto Laravel 13 y reemplazar los archivos del framework.
-- [ ] **Paso 2:** Trasladar modelos y migraciones; eliminar `app/Region.php`.
-- [ ] **Paso 3:** Trasladar `LocationController` y las rutas (`php artisan install:api`).
-- [ ] **Paso 4:** Trasladar el comando `SyncLocations`.
-- [ ] **Paso 5:** Configurar `.env.example` para MySQL (base `escalebridge`).
-- [ ] **Paso 6:** Actualizar el `README.md` (requisitos: PHP 8.3, Laravel 13).
-- [ ] **Paso 7:** Verificación completa (sección 8).
+- [x] **Paso 0:** Crear este plan y hacer commit. *(antes de ejecutar el agente)*
+- [x] **Paso 1:** Crear el esqueleto Laravel 13 y reemplazar los archivos del framework.
+- [x] **Paso 2:** Trasladar modelos y migraciones; eliminar `app/Region.php`.
+- [x] **Paso 3:** Trasladar `LocationController` y las rutas (registradas a mano en `bootstrap/app.php`; no se usó `install:api` porque instala Sanctum, que el proyecto no necesita).
+- [x] **Paso 4:** Trasladar el comando `SyncLocations`.
+- [x] **Paso 5:** Configurar `.env.example` para MySQL (base `escalebridge`).
+- [x] **Paso 6:** Actualizar el `README.md` (requisitos: PHP 8.3, Laravel 13).
+- [x] **Paso 7:** Verificación completa (sección 8).
 
 ## 8. Verificación
 
@@ -104,7 +104,19 @@ Limpieza adicional:
    - `http://brigesnote.test/api/colegios/150101`
 5. Comparar la estructura del JSON con la versión original.
 
-## 9. Riesgos
+## 9. Resultados de la verificación
+
+- `php artisan migrate`: las 4 tablas propias y las de Laravel se crean en MySQL (`escalebridge`).
+- `php artisan sync:locations`: descarga datos reales de ESCALE (probado con las regiones 01 a 08).
+- Los 4 endpoints responden con `status: success` y la misma estructura JSON que antes.
+
+**Diferencia de comportamiento encontrada y corregida:** el cliente HTTP de Laravel 13
+corta las peticiones a los 30 segundos (Laravel 7 no tenía límite). ESCALE tardó más
+en el distrito 080306 y la sincronización se detuvo. Se añadió en `SyncLocations` un
+método `fetch()` con tiempo de espera de 120 s, 3 reintentos y manejo del error para
+continuar con el siguiente distrito.
+
+## 10. Riesgos
 
 | Riesgo | Mitigación |
 |---|---|
@@ -112,10 +124,10 @@ Limpieza adicional:
 | La API de ESCALE cambió o no responde | Probar con una sola región antes de la sincronización completa |
 | La sincronización completa tarda mucho | Ejecutarla al final, una sola vez |
 
-## 10. Fuera de alcance (para después)
+## 11. Fuera de alcance (para después)
 
 - Migración a OpenAPI / arquitectura de microservicios (clase del jueves).
 - Mejoras detectadas en la sincronización, a tratar en commits aparte:
   - Paginación en la consulta de colegios (posibles colegios faltantes).
   - Campos sin `?? null` que pueden detener la sincronización.
-  - Reintentos y pausas entre peticiones a ESCALE.
+  - Pausas entre peticiones a ESCALE (los reintentos ya se añadieron).
