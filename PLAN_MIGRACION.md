@@ -116,6 +116,17 @@ en el distrito 080306 y la sincronización se detuvo. Se añadió en `SyncLocati
 método `fetch()` con tiempo de espera de 120 s, 3 reintentos y manejo del error para
 continuar con el siguiente distrito.
 
+**Error heredado del proyecto original, encontrado y corregido:** ESCALE devuelve como
+máximo 50 colegios por consulta y el comando solo pedía la primera página. Se detectó porque
+los distritos grandes tenían exactamente 50 colegios. Con la paginación (`start` / `max`):
+
+| Dato | Antes | Después |
+|---|---|---|
+| Regiones | 25 | 25 |
+| Provincias | 196 | 196 |
+| Distritos | 1,892 | 1,892 |
+| **Colegios activos** | **57,245** | **115,086** |
+
 ## 10. Riesgos
 
 | Riesgo | Mitigación |
