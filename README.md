@@ -1,6 +1,6 @@
 # 🏫 Bridges Note - MINEDU ESCALE Bridge API
 
-Microservicio y API REST en **Laravel 7** diseñado para sincronizar, estructurar y servir el catálogo oficial de instituciones educativas (colegios) y la división política/geográfica (regiones, provincias y distritos) del Perú, consumiendo directamente la API pública oficial de **MINEDU / ESCALE** (*Estadística de la Calidad Educativa*).
+Microservicio y API REST en **Laravel 13** (PHP 8.3) diseñado para sincronizar, estructurar y servir el catálogo oficial de instituciones educativas (colegios) y la división política/geográfica (regiones, provincias y distritos) del Perú, consumiendo directamente la API pública oficial de **MINEDU / ESCALE** (*Estadística de la Calidad Educativa*).
 
 ---
 
@@ -52,12 +52,13 @@ Servir como un **puente de datos optimizado** para aplicaciones cliente (sistema
 
 ## 💻 Requisitos del Sistema
 
-- **PHP:** `7.4.x` (Recomendado) o `8.0.x`.
-  > ⚠️ **Importante:** Laravel 7 no es compatible con PHP 8.1 o superior debido a cambios en la interfaz `ArrayAccess`.
-- **Laravel Framework:** `7.30.7`
+- **PHP:** `8.3` o superior (en Windows/Laragon: versión **Thread Safe**, x64).
+- **Laravel Framework:** `13.x`
 - **Gestor de Paquetes:** Composer 2.x
-- **Base de Datos:** MySQL 5.7+ / 8.0+ o MariaDB 10.3+
-- **Servidor Web Local:** Laragon (con PHP 7.4 Thread Safe - TS), XAMPP o `php artisan serve`.
+- **Base de Datos:** MySQL 8.0+ o MariaDB 10.3+
+- **Servidor Web Local:** Laragon, XAMPP o `php artisan serve`.
+
+> ℹ️ El proyecto se migró desde Laravel 7 / PHP 7.4. El detalle está en [`PLAN_MIGRACION.md`](PLAN_MIGRACION.md).
 
 ---
 
@@ -99,6 +100,9 @@ php artisan sync:locations
 ```
 
 ### 7. Iniciar el servidor
+Con Laragon, si el proyecto está en `C:\laragon\www\brigesnote`, queda disponible en `http://brigesnote.test`.
+
+Sin Laragon:
 ```bash
 php artisan serve
 ```
@@ -111,11 +115,11 @@ La aplicación quedará disponible en `http://127.0.0.1:8000`.
 Asegúrate de tener estos valores configurados en tu archivo `.env`:
 
 ```env
-APP_NAME="Bridges Note"
+APP_NAME=BridgesNote
 APP_ENV=local
 APP_KEY=base64:...
 APP_DEBUG=true
-APP_URL=http://127.0.0.1:8000
+APP_URL=http://brigesnote.test
 
 # Conexión MySQL
 DB_CONNECTION=mysql
@@ -125,10 +129,10 @@ DB_DATABASE=escalebridge
 DB_USERNAME=root
 DB_PASSWORD=
 
-# Controlador de sesión en archivo (no requiere tabla 'sessions' en BD)
-SESSION_DRIVER=file
-CACHE_DRIVER=file
-QUEUE_CONNECTION=sync
+# Sesiones, caché y colas en base de datos (las tablas se crean con `php artisan migrate`)
+SESSION_DRIVER=database
+CACHE_STORE=database
+QUEUE_CONNECTION=database
 ```
 
 ---
@@ -145,9 +149,18 @@ php artisan sync:locations
 1. **Regiones (`/padron/rest/regiones`):** Descarga los 25 departamentos del país con sus nombres, coordenadas (`pointX`, `pointY`) y nivel de `zoom`.
 2. **Provincias (`/padron/rest/provincias?idRegion={id}`):** Por cada región, descarga sus provincias.
 3. **Distritos (`/padron/rest/distritos?idProvincia={id}`):** Por cada provincia, descarga los distritos correspondientes.
-4. **Colegios (`/padron/rest/instituciones?estados=1&ubigeo={idDistrito}`):** Por cada distrito, descarga las instituciones educativas activas y las almacena en la tabla `schools` vinculando el código modular (`codMod`) como llave primaria y asociando el `idDistrito`.
+4. **Colegios (`/padron/rest/instituciones?estados=1&ubigeo={idDistrito}`):** Por cada distrito, descarga las instituciones educativas activas y las almacena en la tabla `schools` vinculando el código modular (`codMod`) como llave primaria y asociando el `idDistrito`. ESCALE entrega los colegios por páginas (50 por defecto), así que el comando las recorre todas usando los parámetros `start` y `max` (páginas de 200).
 
 > ⏱️ **Nota:** La sincronización total recorre más de 1,800 distritos y 80,000 colegios, por lo que puede tomar varios minutos según la velocidad de conexión y respuesta del servidor del MINEDU.
+
+### Retomar una sincronización interrumpida
+Si el proceso se detiene (corte de conexión, cierre de la terminal, etc.), puedes continuar desde una región concreta con la opción `--desde`. El código de región son los **dos primeros dígitos** del último distrito mostrado:
+
+```bash
+php artisan sync:locations --desde=08
+```
+
+Las regiones anteriores se omiten; la región indicada se vuelve a procesar sin duplicar datos (`updateOrCreate`). Si ESCALE no responde para un distrito, se reintenta 3 veces y, si sigue fallando, se muestra un error en rojo y se continúa con el siguiente.
 
 ---
 
@@ -272,6 +285,8 @@ brigesnote/
 │   ├── ..._create_provinces_table.php
 │   ├── ..._create_districts_table.php
 │   └── ..._create_schools_table.php
+├── bootstrap/
+│   └── app.php                     # Configuración de la app (registra routes/api.php)
 ├── routes/
 │   └── api.php                     # Definición de rutas REST
 ├── .env.example                    # Plantilla de variables de entorno
@@ -282,17 +297,21 @@ brigesnote/
 
 ## 🛠️ Solución de Problemas Frecuentes
 
-### 1. Error: `During inheritance of ArrayAccess: Return type of ... should either be compatible`
-- **Causa:** Estás ejecutando el proyecto con PHP 8.1, 8.2 o superior.
-- **Solución:** Cambia la versión de PHP en Laragon (o en tu servidor) a **PHP 7.4 (Thread Safe)** o **PHP 8.0**.
+### 1. Error: `Your requirements could not be resolved` / `php ^8.3` al ejecutar `composer install`
+- **Causa:** Tu PHP es anterior a 8.3. Laravel 13 requiere PHP 8.3 como mínimo.
+- **Solución:** Cambia la versión de PHP en Laragon (`PHP → Version`) a **8.3 Thread Safe**.
 
 ### 2. Error: `Service Apache can not start ... fcgid.conf` en Laragon
 - **Causa:** Descargaste la versión `nts` (Non-Thread Safe) de PHP en Windows.
-- **Solución:** Descarga e instala en Laragon la versión **Thread Safe (TS)** desde [windows.php.net](https://windows.php.net/downloads/releases/archives/).
+- **Solución:** Descarga e instala en Laragon la versión **Thread Safe (TS)** desde [windows.php.net](https://windows.php.net/download/).
 
-### 3. Error: `Base table or view not found: 1146 Table '...sessions' doesn't exist`
-- **Causa:** En el archivo `.env` está configurado `SESSION_DRIVER=database` sin haber migrado la tabla de sesiones.
-- **Solución:** Cambia en `.env` a `SESSION_DRIVER=file`.
+### 3. Error al iniciar Apache: `No se encuentra el punto de entrada del procedimiento ... php_curl.dll`
+- **Causa:** La carpeta `bin` de Apache trae versiones antiguas de `libssh2.dll` y `nghttp2.dll`, que se cargan antes que las de PHP 8.3.
+- **Solución:** En `C:\laragon\bin\apache\<versión>\bin`, renombra esos archivos a `.old` y copia en su lugar los de la carpeta de PHP 8.3.
+
+### 4. Error: `could not find driver (Connection: sqlite ...)`
+- **Causa:** El `.env` usa `DB_CONNECTION=sqlite` (valor por defecto de Laravel 13).
+- **Solución:** Configura MySQL en `.env` como se indica en la sección de configuración y vuelve a ejecutar `php artisan migrate`.
 
 ---
 
